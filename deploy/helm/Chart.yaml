@@ -1,0 +1,6 @@
+apiVersion: v2
+name: bithub
+description: helm chart of bithub which support bit remote scope and image server. 
+type: application
+version: 0.0.1
+appVersion: "0.0.1"
