@@ -1,16 +1,17 @@
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "bithub.fullname" . }}
+  name: {{ include "bithub.name" . }}-{{ .Values.designDomain.name }}
   labels:
     {{- include "bithub.labels" . | nindent 4 }}
+    component: {{ .Values.designDomain.name | quote }}
 spec:
-  {{- if not .Values.autoscaling.enabled }}
-  replicas: {{ .Values.replicaCount }}
-  {{- end }}
+  replicas: 1
   selector:
     matchLabels:
       {{- include "bithub.selectorLabels" . | nindent 6 }}
+      component: {{ .Values.designDomain.name | quote }}
   template:
     metadata:
       {{- with .Values.podAnnotations }}
@@ -19,6 +20,7 @@ spec:
       {{- end }}
       labels:
         {{- include "bithub.selectorLabels" . | nindent 8 }}
+        component: {{ .Values.designDomain.name | quote }}
     spec:
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
@@ -27,16 +29,45 @@ spec:
       serviceAccountName: {{ include "bithub.serviceAccountName" . }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      volumes:
+        - name: s3fs-cache
+          emptyDir: {}
+      initContainers:
+        - name: s3fs-init
+          volumeMounts:
+            - name: s3fs-cache
+              mountPath: /data
       containers:
-        - name: {{ .Chart.Name }}
+        - name: s3fs
+          ecurityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.s3fs.repository }}:{{ .Values.image.s3fs.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.s3fs.pullPolicy }}
+          env:
+            - name: todo
+              value: todo
+          volumeMounts:
+            - name: s3fs-cache
+              mountPath: /data
+              mountPropagation: Bidirectional
+        - name: bitserver
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          image: "{{ .Values.image.bitserver.repository }}:{{ .Values.image.bitserver.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.bitserver.pullPolicy }}
+          env:
+          - name: SCOPE
+            value: {{ .Values.designDomain.name }}
+          - name: SCOPE_REMOTES
+            value: todo
           ports:
-            - name: http
-              containerPort: 80
+            - name: scope
+              containerPort: 3000
               protocol: TCP
+          volumeMounts:
+            - name: s3fs-cache
+              mountPath: /root/data
+              mountPropagation: HostToContainer
           livenessProbe:
             httpGet:
               path: /
@@ -59,3 +90,175 @@ spec:
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+        - name: easyimage
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.easyimage.repository }}:{{ .Values.image.easyimage.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.easyimage.pullPolicy }}
+          env:
+          - name: todo
+            value: todo
+          ports:
+            - name: image
+              containerPort: 8000
+              protocol: TCP
+          volumeMounts:
+            - name: s3fs-cache
+              mountPath: /root/data
+              mountPropagation: HostToContainer
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+{{- range .Values.domains }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "bithub.name" $ }}-{{ .name }}
+  labels:
+    {{- include "bithub.labels" $ | nindent 4 }}
+    component: {{ .name | quote }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "bithub.selectorLabels" $ | nindent 6 }}
+      component: {{ .name | quote }}
+  template:
+    metadata:
+      {{- with $.Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "bithub.selectorLabels" $ | nindent 8 }}
+        component: {{ .name | quote }}
+    spec:
+      {{- with $.Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "bithub.serviceAccountName" $ }}
+      securityContext:
+        {{- toYaml $.Values.podSecurityContext | nindent 8 }}
+      volumes:
+        - name: s3fs-cache
+          emptyDir: {}
+      initContainers:
+        - name: s3fs-init
+          volumeMounts:
+            - name: s3fs-cache
+              mountPath: /data
+      containers:
+        - name: s3fs
+          ecurityContext:
+            {{- toYaml $.Values.securityContext | nindent 12 }}
+          image: "{{ $.Values.image.s3fs.repository }}:{{ $.Values.image.s3fs.tag | default $.Chart.AppVersion }}"
+          imagePullPolicy: {{ $.Values.image.s3fs.pullPolicy }}
+          env:
+            - name: todo
+              value: todo
+          volumeMounts:
+            - name: s3fs-cache
+              mountPath: /data
+              mountPropagation: Bidirectional
+        - name: bitserver
+          securityContext:
+            {{- toYaml $.Values.securityContext | nindent 12 }}
+          image: "{{ $.Values.image.bitserver.repository }}:{{ $.Values.image.bitserver.tag | default $.Chart.AppVersion }}"
+          imagePullPolicy: {{ $.Values.image.bitserver.pullPolicy }}
+          env:
+          - name: SCOPE
+            value: {{ .name }}
+          - name: SCOPE_REMOTES
+            value: todo
+          ports:
+            - name: scope
+              containerPort: 3000
+              protocol: TCP
+          volumeMounts:
+            - name: s3fs-cache
+              mountPath: /root/data
+              mountPropagation: HostToContainer
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+          resources:
+            {{- toYaml $.Values.resources | nindent 12 }}
+      {{- with $.Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $.Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $.Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+        - name: easyimage
+          securityContext:
+            {{- toYaml $.Values.securityContext | nindent 12 }}
+          image: "{{ $.Values.image.easyimage.repository }}:{{ $.Values.image.easyimage.tag | default $.Chart.AppVersion }}"
+          imagePullPolicy: {{ $.Values.image.easyimage.pullPolicy }}
+          env:
+          - name: todo
+            value: todo
+          ports:
+            - name: image
+              containerPort: 8000
+              protocol: TCP
+          volumeMounts:
+            - name: s3fs-cache
+              mountPath: /root/data
+              mountPropagation: HostToContainer
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+          resources:
+            {{- toYaml $.Values.resources | nindent 12 }}
+      {{- with $.Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $.Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $.Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+{{- end }}

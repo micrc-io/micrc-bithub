@@ -1,15 +1,48 @@
+---
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "bithub.fullname" . }}
+  name: {{ include "bithub.fullname" . }}-{{ .Values.designDomain.name }}
   labels:
     {{- include "bithub.labels" . | nindent 4 }}
+    component: {{ .Values.designDomain.name | quote }}
 spec:
   type: {{ .Values.service.type }}
   ports:
-    - port: {{ .Values.service.port }}
-      targetPort: http
+    - port: {{ .Values.service.scope.port }}
+      targetPort: scope
       protocol: TCP
-      name: http
+      name: scope
+    - port: {{ .Values.service.image.port }}
+      targetPort: image
+      protocol: TCP
+      name: image
   selector:
     {{- include "bithub.selectorLabels" . | nindent 4 }}
+    component: {{ .Values.designDomain.name | quote }}
+
+{{- range .Values.domains }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "bithub.fullname" $ }}-{{ .name }}
+  labels:
+    {{- include "bithub.labels" $ | nindent 4 }}
+    component: {{ .name | quote }}
+spec:
+  type: {{ $.Values.service.type }}
+  ports:
+    - port: {{ $.Values.service.scope.port }}
+      targetPort: scope
+      protocol: TCP
+      name: scope
+    - port: {{ $.Values.service.image.port }}
+      targetPort: image
+      protocol: TCP
+      name: image
+  selector:
+    {{- include "bithub.selectorLabels" $ | nindent 4 }}
+    component: {{ .name | quote }}
+
+{{- end }}

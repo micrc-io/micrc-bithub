@@ -1,22 +1,27 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-generatorOptions:
-  disableNameSuffixHash: true
-
-configMapGenerator:
-  - name: ${name}-service
-    files:
-      - ../../../../../resources/main/micrc.properties
-
 helmGlobals:
   chartHome: ../../helm
 
 helmCharts:
   - name: bithub
     includeCRDs: false
-    releaseName: bithub
+    releaseName: demo-bithub
     version: 0.0.1
     valuesInline:
+      gateway:
+        name: 'demo-it/it-demo-gateway'
+        host: 'bithub.integration.it.demo.com'
+      designDomain:
+        name: design
+        dependencies:
+          - security
+          - order
+      domains:
+        - name: security
+          dependencies: design
+        - name: order
+          dependencies: design
       podAnnotations:
         sidecar.istio.io/inject: 'true'
