@@ -2,21 +2,22 @@
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
 
-gateway:
-  name: 'colibri-erp-it/it-colibri-gateway'
-  host: 'bithub.integration.it.colibrierp.com.br'
-
 designDomain:
-  name: design
-  dependencies:
-    - security
-    - order
+  name: ""
+  dependencies: []
 
-domains:
-  - name: security
-    dependencies: design
-  - name: order
-    dependencies: design
+domains: []
+
+gateway:
+  name: ""
+  host: ""
+
+bucketSecret:
+  name: ""
+  urlKey: ""
+  bucketNameKey: ""
+  accessIdKey: ""
+  accessSecretKey: ""
 
 image:
   bitserver:
@@ -24,9 +25,9 @@ image:
     pullPolicy: IfNotPresent
     tag: ""
   s3fs:
-    repository: nginx
+    repository: efrecon/s3fs
     pullPolicy: IfNotPresent
-    tag: ""
+    tag: "1.92"
   easyimage:
     repository: nginx
     pullPolicy: IfNotPresent

@@ -32,23 +32,88 @@ spec:
       volumes:
         - name: s3fs-cache
           emptyDir: {}
+        - name: s3fs-cache-scope
+          emptyDir: {}
+        - name: s3fs-cache-image
+          emptyDir: {}
       initContainers:
         - name: s3fs-init
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.s3fs.repository }}:{{ .Values.image.s3fs.tag }}"
+          imagePullPolicy: {{ .Values.image.s3fs.pullPolicy }}
+          args:
+            - |
+              S3_MOUNT=${AWS_S3_MOUNT:-/opt/s3fs/bucket};
+              mkdir -p $S3_MOUNT/$DOMAIN/scope;
+              mkdir -p $S3_MOUNT/$DOMAIN/image;
+              echo "Caught $SIGNAL! Unmounting ${S3_MOUNT}...";
+              fusermount -uz "${S3_MOUNT}";
+              s3fs=$(ps -o pid= -o comm= | grep s3fs | sed -E 's/\s*(\d+)\s+.*/\1/g');
+              if [ -n "$s3fs" ]; then
+                kill -INT "$s3fs";
+              fi
+          env:
+            - name: DOMAIN
+              value: {{ .Values.designDomain.name }}
+            - name: AWS_S3_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.bucketSecret.name }}
+                  key: {{ .Values.bucketSecret.urlKey }}
+            - name: AWS_S3_BUCKET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.bucketSecret.name }}
+                  key: {{ .Values.bucketSecret.bucketNameKey }}
+            - name: AWS_S3_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.bucketSecret.name }}
+                  key: {{ .Values.bucketSecret.accessIdKey }}
+            - name: AWS_S3_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.bucketSecret.name }}
+                  key: {{ .Values.bucketSecret.accessSecretKey }}
           volumeMounts:
             - name: s3fs-cache
-              mountPath: /data
+              mountPath: /opt/s3fs/bucket
+              mountPropagation: Bidirectional
       containers:
-        - name: s3fs
-          ecurityContext:
+        - name: s3fs-sidecar-bitserver
+          securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
-          image: "{{ .Values.image.s3fs.repository }}:{{ .Values.image.s3fs.tag | default .Chart.AppVersion }}"
+          image: "{{ .Values.image.s3fs.repository }}:{{ .Values.image.s3fs.tag }}"
           imagePullPolicy: {{ .Values.image.s3fs.pullPolicy }}
           env:
-            - name: todo
-              value: todo
+            - name: DOMAIN
+              value: {{ .Values.designDomain.name }}
+            - name: AWS_S3_BUCKET_BASE
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.bucketSecret.name }}
+                  key: {{ .Values.bucketSecret.bucketNameKey }}
+            - name: AWS_S3_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.bucketSecret.name }}
+                  key: {{ .Values.bucketSecret.urlKey }}
+            - name: AWS_S3_BUCKET
+              value: $(AWS_S3_BUCKET_BASE):/$(DOMAIN)/scope
+            - name: AWS_S3_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.bucketSecret.name }}
+                  key: {{ .Values.bucketSecret.accessIdKey }}
+            - name: AWS_S3_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.bucketSecret.name }}
+                  key: {{ .Values.bucketSecret.accessSecretKey }}
           volumeMounts:
-            - name: s3fs-cache
-              mountPath: /data
+            - name: s3fs-cache-scope
+              mountPath: /opt/s3fs/bucket
               mountPropagation: Bidirectional
         - name: bitserver
           securityContext:
@@ -59,13 +124,18 @@ spec:
           - name: SCOPE
             value: {{ .Values.designDomain.name }}
           - name: SCOPE_REMOTES
-            value: todo
+            value:
+              {{- $remotes := list -}}
+              {{- range .Values.designDomain.dependencies -}}
+              {{- $remotes = append $remotes (printf "%s@https://%s.%s" . . $.Values.gateway.host) -}}
+              {{- end -}}
+              {{ printf " %s" (join "," $remotes) }}
           ports:
             - name: scope
               containerPort: 3000
               protocol: TCP
           volumeMounts:
-            - name: s3fs-cache
+            - name: s3fs-cache-scope
               mountPath: /root/data
               mountPropagation: HostToContainer
           livenessProbe:
@@ -90,6 +160,40 @@ spec:
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+        - name: s3fs-sidecar-easyimage
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.s3fs.repository }}:{{ .Values.image.s3fs.tag }}"
+          imagePullPolicy: {{ .Values.image.s3fs.pullPolicy }}
+          env:
+            - name: DOMAIN
+              value: {{ .Values.designDomain.name }}
+            - name: AWS_S3_BUCKET_BASE
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.bucketSecret.name }}
+                  key: {{ .Values.bucketSecret.bucketNameKey }}
+            - name: AWS_S3_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.bucketSecret.name }}
+                  key: {{ .Values.bucketSecret.urlKey }}
+            - name: AWS_S3_BUCKET
+              value: $(AWS_S3_BUCKET_BASE):/$(DOMAIN)/image
+            - name: AWS_S3_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.bucketSecret.name }}
+                  key: {{ .Values.bucketSecret.accessIdKey }}
+            - name: AWS_S3_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.bucketSecret.name }}
+                  key: {{ .Values.bucketSecret.accessSecretKey }}
+          volumeMounts:
+            - name: s3fs-cache-image
+              mountPath: /opt/s3fs/bucket
+              mountPropagation: Bidirectional
         - name: easyimage
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
@@ -103,9 +207,9 @@ spec:
               containerPort: 8000
               protocol: TCP
           volumeMounts:
-            - name: s3fs-cache
-              mountPath: /root/data
-              mountPropagation: HostToContainer
+            - name: s3fs-cache-image
+              mountPath: /opt/s3fs/bucket
+              mountPropagation: Bidirectional
           livenessProbe:
             httpGet:
               path: /
@@ -191,7 +295,12 @@ spec:
           - name: SCOPE
             value: {{ .name }}
           - name: SCOPE_REMOTES
-            value: todo
+            value:
+              {{- $remotes := list -}}
+              {{- range .dependencies -}}
+              {{- $remotes = append $remotes (printf "%s@https://%s.%s" . . $.Values.gateway.host) -}}
+              {{- end -}}
+              {{ printf " %s" (join "," $remotes) }}
           ports:
             - name: scope
               containerPort: 3000
