@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "bithub.name" . }}
+  labels:
+    {{- include "bithub.labels" . | nindent 4 }}
+data:
+  s3fs-setup: |-
+    #! /usr/bin/env sh
+    S3_MOUNT=${AWS_S3_MOUNT:-/opt/s3fs/bucket};
+    mkdir -p $S3_MOUNT/$DOMAIN/scope;
+    mkdir -p $S3_MOUNT/$DOMAIN/image;
+    echo "Unmounting ${S3_MOUNT}...";
+    fusermount -uz "${S3_MOUNT}";
+    s3fs=$(ps -o pid= -o comm= | grep s3fs | sed -E 's/\s*(\d+)\s+.*/\1/g');
+    if [ -n "$s3fs" ]; then
+      kill -INT "$s3fs";
+    fi

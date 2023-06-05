@@ -18,10 +18,12 @@ helmCharts:
         dependencies:
           - security
           - order
-      domains:
-        - name: security
-          dependencies: design
-        - name: order
-          dependencies: design
+      # domains:
+      #   - name: security
+      #     dependencies:
+      #       - design
+      #   - name: order
+      #     dependencies:
+      #       - design
       podAnnotations:
         sidecar.istio.io/inject: 'true'

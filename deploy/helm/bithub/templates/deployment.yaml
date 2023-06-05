@@ -30,6 +30,10 @@ spec:
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       volumes:
+        - name: s3fs-setup
+          configMap:
+            name: {{ include "bithub.name" . }}
+            defaultMode: 0755
         - name: s3fs-cache
           emptyDir: {}
         - name: s3fs-cache-scope
@@ -43,16 +47,7 @@ spec:
           image: "{{ .Values.image.s3fs.repository }}:{{ .Values.image.s3fs.tag }}"
           imagePullPolicy: {{ .Values.image.s3fs.pullPolicy }}
           args:
-            - |
-              S3_MOUNT=${AWS_S3_MOUNT:-/opt/s3fs/bucket};
-              mkdir -p $S3_MOUNT/$DOMAIN/scope;
-              mkdir -p $S3_MOUNT/$DOMAIN/image;
-              echo "Caught $SIGNAL! Unmounting ${S3_MOUNT}...";
-              fusermount -uz "${S3_MOUNT}";
-              s3fs=$(ps -o pid= -o comm= | grep s3fs | sed -E 's/\s*(\d+)\s+.*/\1/g');
-              if [ -n "$s3fs" ]; then
-                kill -INT "$s3fs";
-              fi
+            - "/scripts/setup.sh"
           env:
             - name: DOMAIN
               value: {{ .Values.designDomain.name }}
@@ -77,6 +72,9 @@ spec:
                   name: {{ .Values.bucketSecret.name }}
                   key: {{ .Values.bucketSecret.accessSecretKey }}
           volumeMounts:
+            - name: s3fs-setup
+              mountPath: /scripts/setup.sh
+              subPath: setup.sh
             - name: s3fs-cache
               mountPath: /opt/s3fs/bucket
               mountPropagation: Bidirectional
@@ -197,7 +195,7 @@ spec:
         - name: easyimage
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
-          image: "{{ .Values.image.easyimage.repository }}:{{ .Values.image.easyimage.tag | default .Chart.AppVersion }}"
+          image: "{{ .Values.image.easyimage.repository }}:{{ .Values.image.easyimage.tag }}"
           imagePullPolicy: {{ .Values.image.easyimage.pullPolicy }}
           env:
           - name: todo
