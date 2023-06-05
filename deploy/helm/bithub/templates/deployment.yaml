@@ -38,7 +38,11 @@ spec:
           emptyDir: {}
         - name: s3fs-cache-scope
           emptyDir: {}
+        - name: share-scope
+          emptyDir: {}
         - name: s3fs-cache-image
+          emptyDir: {}
+        - name: share-image
           emptyDir: {}
       initContainers:
         - name: s3fs-init
@@ -47,34 +51,28 @@ spec:
           image: "{{ .Values.image.s3fs.repository }}:{{ .Values.image.s3fs.tag }}"
           imagePullPolicy: {{ .Values.image.s3fs.pullPolicy }}
           args:
-            - "/scripts/setup.sh"
+            - "/scripts/s3fs-setup.sh"
           env:
             - name: DOMAIN
               value: {{ .Values.designDomain.name }}
             - name: AWS_S3_URL
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.bucketSecret.name }}
-                  key: {{ .Values.bucketSecret.urlKey }}
+              value: {{ .Values.bucket.endpoint }}
             - name: AWS_S3_BUCKET
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.bucketSecret.name }}
-                  key: {{ .Values.bucketSecret.bucketNameKey }}
+              value: {{ .Values.bucket.name }}
             - name: AWS_S3_ACCESS_KEY_ID
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.bucketSecret.name }}
-                  key: {{ .Values.bucketSecret.accessIdKey }}
+                  name: {{ .Values.bucket.secretName }}
+                  key: {{ .Values.bucket.accessIdKey }}
             - name: AWS_S3_SECRET_ACCESS_KEY
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.bucketSecret.name }}
-                  key: {{ .Values.bucketSecret.accessSecretKey }}
+                  name: {{ .Values.bucket.secretName }}
+                  key: {{ .Values.bucket.accessSecretKey }}
           volumeMounts:
             - name: s3fs-setup
-              mountPath: /scripts/setup.sh
-              subPath: setup.sh
+              mountPath: /scripts/s3fs-setup.sh
+              subPath: s3fs-setup.sh
             - name: s3fs-cache
               mountPath: /opt/s3fs/bucket
               mountPropagation: Bidirectional
@@ -88,31 +86,50 @@ spec:
             - name: DOMAIN
               value: {{ .Values.designDomain.name }}
             - name: AWS_S3_BUCKET_BASE
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.bucketSecret.name }}
-                  key: {{ .Values.bucketSecret.bucketNameKey }}
+              value: {{ .Values.bucket.name }}
             - name: AWS_S3_URL
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.bucketSecret.name }}
-                  key: {{ .Values.bucketSecret.urlKey }}
+              value: {{ .Values.bucket.endpoint }}
             - name: AWS_S3_BUCKET
               value: $(AWS_S3_BUCKET_BASE):/$(DOMAIN)/scope
             - name: AWS_S3_ACCESS_KEY_ID
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.bucketSecret.name }}
-                  key: {{ .Values.bucketSecret.accessIdKey }}
+                  name: {{ .Values.bucket.secretName }}
+                  key: {{ .Values.bucket.accessIdKey }}
             - name: AWS_S3_SECRET_ACCESS_KEY
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.bucketSecret.name }}
-                  key: {{ .Values.bucketSecret.accessSecretKey }}
+                  name: {{ .Values.bucket.secretName }}
+                  key: {{ .Values.bucket.accessSecretKey }}
           volumeMounts:
             - name: s3fs-cache-scope
               mountPath: /opt/s3fs/bucket
               mountPropagation: Bidirectional
+            - name: share-scope
+              mountPath: /share
+          lifecycle:
+            postStart:
+              exec:
+                command:
+                  - /bin/sh
+                  - -c
+                  - |
+                    until healthcheck.sh; do
+                      echo wait for s3fs mount;
+                      sleep 1;
+                    done
+            preStop:
+              exec:
+                command:
+                  - /bin/sh
+                  - -c
+                  - |
+                    until [ -f "/share/term" ]; do
+                      echo wait for bit server stop;
+                      sleep 1;
+                    done
+                    sleep 10;
+                    rm -rf /share/term;
         - name: bitserver
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
@@ -134,8 +151,19 @@ spec:
               protocol: TCP
           volumeMounts:
             - name: s3fs-cache-scope
-              mountPath: /root/data
-              mountPropagation: HostToContainer
+              mountPath: /root/{{ .Values.designDomain.name }}
+              mountPropagation: Bidirectional
+            - name: share-scope
+              mountPath: /share
+          lifecycle:
+            postStart:
+              exec:
+                command:
+                  - /bin/sh
+                  - -c
+                  - |
+                    trap "touch /share/term" INT;
+                    trap "touch /share/term" TERM;
           livenessProbe:
             httpGet:
               path: /
@@ -167,31 +195,50 @@ spec:
             - name: DOMAIN
               value: {{ .Values.designDomain.name }}
             - name: AWS_S3_BUCKET_BASE
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.bucketSecret.name }}
-                  key: {{ .Values.bucketSecret.bucketNameKey }}
+              value: {{ .Values.bucket.name }}
             - name: AWS_S3_URL
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.bucketSecret.name }}
-                  key: {{ .Values.bucketSecret.urlKey }}
+              value: {{ .Values.bucket.endpoint }}
             - name: AWS_S3_BUCKET
               value: $(AWS_S3_BUCKET_BASE):/$(DOMAIN)/image
             - name: AWS_S3_ACCESS_KEY_ID
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.bucketSecret.name }}
-                  key: {{ .Values.bucketSecret.accessIdKey }}
+                  name: {{ .Values.bucket.secretName }}
+                  key: {{ .Values.bucket.accessIdKey }}
             - name: AWS_S3_SECRET_ACCESS_KEY
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.bucketSecret.name }}
-                  key: {{ .Values.bucketSecret.accessSecretKey }}
+                  name: {{ .Values.bucket.secretName }}
+                  key: {{ .Values.bucket.accessSecretKey }}
           volumeMounts:
             - name: s3fs-cache-image
               mountPath: /opt/s3fs/bucket
               mountPropagation: Bidirectional
+            - name: share-image
+              mountPath: /share
+          lifecycle:
+            postStart:
+              exec:
+                command:
+                  - /bin/sh
+                  - -c
+                  - |
+                    until healthcheck.sh; do
+                      echo wait for s3fs mount;
+                      sleep 1;
+                    done
+            preStop:
+              exec:
+                command:
+                  - /bin/sh
+                  - -c
+                  - |
+                    until [ -f "/share/term" ]; do
+                      echo wait for bit server stop;
+                      sleep 1;
+                    done
+                    sleep 10;
+                    rm -rf /share/term;
         - name: easyimage
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
@@ -208,6 +255,17 @@ spec:
             - name: s3fs-cache-image
               mountPath: /opt/s3fs/bucket
               mountPropagation: Bidirectional
+            - name: share-image
+              mountPath: /share
+          lifecycle:
+            postStart:
+              exec:
+                command:
+                  - /bin/sh
+                  - -c
+                  - |
+                    trap "touch /share/term" INT;
+                    trap "touch /share/term" TERM;
           livenessProbe:
             httpGet:
               path: /

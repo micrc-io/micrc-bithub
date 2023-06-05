@@ -5,7 +5,7 @@ metadata:
   labels:
     {{- include "bithub.labels" . | nindent 4 }}
 data:
-  s3fs-setup: |-
+  s3fs-setup.sh: |-
     #! /usr/bin/env sh
     S3_MOUNT=${AWS_S3_MOUNT:-/opt/s3fs/bucket};
     mkdir -p $S3_MOUNT/$DOMAIN/scope;

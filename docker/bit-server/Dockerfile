@@ -23,4 +23,5 @@ RUN chmod +x /root/bin/start.sh
 ENV SCOPE=
 ENV SCOPE_REMOTES=
 
-CMD [ "start.sh" ]
+ENTRYPOINT [ "start.sh" ]
+CMD []

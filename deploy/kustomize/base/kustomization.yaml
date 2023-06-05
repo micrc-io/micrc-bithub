@@ -25,5 +25,11 @@ helmCharts:
       #   - name: order
       #     dependencies:
       #       - design
+      bucket:
+        name: bithub-storage
+        endpoint: https://oss-cn-chengdu.aliyuncs.com
+        secretName: aliyun-secret
+        accessIdKey: access-key
+        accessSecretKey: secret-key
       podAnnotations:
         sidecar.istio.io/inject: 'true'

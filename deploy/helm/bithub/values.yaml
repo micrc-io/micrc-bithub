@@ -12,10 +12,10 @@ gateway:
   name: ""
   host: ""
 
-bucketSecret:
+bucket:
   name: ""
-  urlKey: ""
-  bucketNameKey: ""
+  endpoint: ""
+  secretName: ""
   accessIdKey: ""
   accessSecretKey: ""
 
@@ -51,10 +51,11 @@ podAnnotations: {}
 podSecurityContext: {}
   # fsGroup: 2000
 
-securityContext: {}
-  # capabilities:
-  #   drop:
-  #   - ALL
+securityContext:
+  privileged: true
+  capabilities:
+    add:
+    - SYS_ADMIN
   # readOnlyRootFilesystem: true
   # runAsNonRoot: true
   # runAsUser: 1000
