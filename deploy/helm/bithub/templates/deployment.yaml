@@ -167,7 +167,7 @@ spec:
                     trap "touch /share/term" TERM;
           startupProbe:
             failureThreshold: 60
-            initialDelaySeconds: 60
+            initialDelaySeconds: 300
             periodSeconds: 10
             successThreshold: 1
             timeoutSeconds: 1
@@ -176,7 +176,7 @@ spec:
               port: scope
           livenessProbe:
             initialDelaySeconds: 60
-            periodSeconds: 10
+            periodSeconds: 5
             failureThreshold: 60
             successThreshold: 1
             timeoutSeconds: 1
@@ -185,7 +185,7 @@ spec:
               port: scope
           readinessProbe:
             initialDelaySeconds: 60
-            periodSeconds: 10
+            periodSeconds: 5
             failureThreshold: 60
             successThreshold: 1
             timeoutSeconds: 1

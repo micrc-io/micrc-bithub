@@ -31,5 +31,3 @@ helmCharts:
         secretName: aliyun-secret
         accessIdKey: access-key
         accessSecretKey: secret-key
-      podAnnotations:
-        sidecar.istio.io/inject: 'true'

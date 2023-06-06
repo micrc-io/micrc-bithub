@@ -46,7 +46,10 @@ serviceAccount:
   # If not set and create is true, a name is generated using the fullname template
   name: ""
 
-podAnnotations: {}
+podAnnotations:
+  proxy.istio.io/config: |
+    holdApplicationUntilProxyStarts: true
+  sidecar.istio.io/inject: 'true'
 
 podSecurityContext: {}
   # fsGroup: 2000

@@ -11,7 +11,7 @@ spec:
   - {{ .Values.designDomain.name }}.{{ .Values.gateway.host }}
   gateways:
   - {{ .Values.gateway.name  }}
-  tcp:
+  http:
   - route:
     - destination:
         host: {{ include "bithub.fullname" . }}-{{ .Values.designDomain.name }}
@@ -31,7 +31,7 @@ spec:
   - image.{{ .Values.designDomain.name }}.{{ .Values.gateway.host }}
   gateways:
   - {{ .Values.gateway.name  }}
-  tcp:
+  http:
   - route:
     - destination:
         host: {{ include "bithub.fullname" . }}-{{ .Values.designDomain.name }}
