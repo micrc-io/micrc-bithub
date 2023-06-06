@@ -9,7 +9,9 @@ data:
     #! /usr/bin/env sh
     S3_MOUNT=${AWS_S3_MOUNT:-/opt/s3fs/bucket};
     mkdir -p $S3_MOUNT/$DOMAIN/scope;
+    echo "created scope path for $DOMAIN"
     mkdir -p $S3_MOUNT/$DOMAIN/image;
+    echo "created image path for $DOMAIN"
     echo "Unmounting ${S3_MOUNT}...";
     fusermount -uz "${S3_MOUNT}";
     s3fs=$(ps -o pid= -o comm= | grep s3fs | sed -E 's/\s*(\d+)\s+.*/\1/g');

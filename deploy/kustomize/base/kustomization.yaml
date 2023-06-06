@@ -7,12 +7,12 @@ helmGlobals:
 helmCharts:
   - name: bithub
     includeCRDs: false
-    releaseName: demo-bithub
+    releaseName: colibri-bithub
     version: 0.0.1
     valuesInline:
       gateway:
-        name: 'demo-it/it-demo-gateway'
-        host: 'bithub.integration.it.demo.com'
+        name: 'it-colibri-gateway'
+        host: 'bithub.integration.it.colibrierp.com.br'
       designDomain:
         name: design
         dependencies:

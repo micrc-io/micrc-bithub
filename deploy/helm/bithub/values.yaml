@@ -29,9 +29,9 @@ image:
     pullPolicy: IfNotPresent
     tag: "1.92"
   easyimage:
-    repository: nginx
+    repository: ddsderek/easyimage
     pullPolicy: IfNotPresent
-    tag: ""
+    tag: "v2.8.3"
 
 imagePullSecrets: []
 nameOverride: ""

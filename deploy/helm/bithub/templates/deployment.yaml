@@ -114,6 +114,7 @@ spec:
                   - /bin/sh
                   - -c
                   - |
+                    sleep 100;
                     until healthcheck.sh; do
                       echo wait for s3fs mount;
                       sleep 1;
@@ -164,14 +165,33 @@ spec:
                   - |
                     trap "touch /share/term" INT;
                     trap "touch /share/term" TERM;
+          startupProbe:
+            failureThreshold: 60
+            initialDelaySeconds: 60
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 1
+            httpGet:
+              path: /
+              port: scope
           livenessProbe:
+            initialDelaySeconds: 60
+            periodSeconds: 10
+            failureThreshold: 60
+            successThreshold: 1
+            timeoutSeconds: 1
             httpGet:
               path: /
-              port: http
+              port: scope
           readinessProbe:
+            initialDelaySeconds: 60
+            periodSeconds: 10
+            failureThreshold: 60
+            successThreshold: 1
+            timeoutSeconds: 1
             httpGet:
               path: /
-              port: http
+              port: scope
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
       {{- with .Values.nodeSelector }}
@@ -245,15 +265,22 @@ spec:
           image: "{{ .Values.image.easyimage.repository }}:{{ .Values.image.easyimage.tag }}"
           imagePullPolicy: {{ .Values.image.easyimage.pullPolicy }}
           env:
-          - name: todo
-            value: todo
+          - name: TZ
+            value: Asia/Shanghai
+          - name: DEBUG
+            value: "true"
           ports:
             - name: image
-              containerPort: 8000
+              containerPort: 80
               protocol: TCP
           volumeMounts:
             - name: s3fs-cache-image
-              mountPath: /opt/s3fs/bucket
+              mountPath: /app/web/config
+              subPath: config
+              mountPropagation: Bidirectional
+            - name: s3fs-cache-image
+              mountPath: /app/web/i
+              subPath: i
               mountPropagation: Bidirectional
             - name: share-image
               mountPath: /share
@@ -269,11 +296,11 @@ spec:
           livenessProbe:
             httpGet:
               path: /
-              port: http
+              port: image
           readinessProbe:
             httpGet:
               path: /
-              port: http
+              port: image
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
       {{- with .Values.nodeSelector }}

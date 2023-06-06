@@ -16,7 +16,7 @@ spec:
     - destination:
         host: {{ include "bithub.fullname" . }}-{{ .Values.designDomain.name }}
         port:
-          number: 3000
+          number: {{ .Values.service.scope.port }}
 
 ---
 apiVersion: networking.istio.io/v1alpha3
@@ -36,7 +36,7 @@ spec:
     - destination:
         host: {{ include "bithub.fullname" . }}-{{ .Values.designDomain.name }}
         port:
-          number: 8000
+          number: {{ .Values.service.image.port }}
 
 {{- range .Values.domains }}
 ---
@@ -57,7 +57,7 @@ spec:
     - destination:
         host: {{ include "bithub.fullname" $ }}-{{ .name }}
         port:
-          number: 3000
+          number: {{ .Values.service.scope.port }}
 
 ---
 apiVersion: networking.istio.io/v1alpha3
@@ -77,6 +77,6 @@ spec:
     - destination:
         host: {{ include "bithub.fullname" $ }}-{{ .name }}
         port:
-          number: 8000
+          number: {{ .Values.service.image.port }}
 
 {{- end }}
