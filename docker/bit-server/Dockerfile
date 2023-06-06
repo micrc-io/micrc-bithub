@@ -1,5 +1,5 @@
 ARG BASE_IMAGE=node:18.14.2
-FROM $BASE_IMAGE
+FROM --platform=linux/amd64 $BASE_IMAGE
 USER root
 
 ARG BVM_VERSION=0.3.1

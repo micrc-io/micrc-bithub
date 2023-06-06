@@ -1,3 +1,4 @@
+#! /usr/bin/env sh
 
 if [ ! $SCOPE ]; then
   echo scope must be exists.
