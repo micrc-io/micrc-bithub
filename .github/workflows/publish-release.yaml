@@ -1,0 +1,31 @@
+name: bitserver docker image build and push
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  builder_agent:
+    name: Bitserver docker image build and push to dockerhub
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+    - name: Docker meta
+      id: meta
+      uses: docker/metadata-action@v4
+      with:
+        images: micrc/builder-agent
+        tags: type=semver,pattern={{version}}
+    - name: Login to DockerHub
+      uses: docker/login-action@v2
+      with:
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
+    - name: Build and push
+      uses: docker/build-push-action@v3
+      with:
+        context: ./docker/bit-server
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
