@@ -2,7 +2,7 @@ ARG BASE_IMAGE=node:16.20.0-alpine
 FROM --platform=linux/amd64 $BASE_IMAGE
 USER root
 
-RUN apk add --update --no-cache zstd
+RUN apk add --update --no-cache zstd git
 
 ARG BVM_VERSION=0.3.1
 ARG BIT_VERSION=0.0.1000
