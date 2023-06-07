@@ -49,15 +49,15 @@ metadata:
     component: {{ .name | quote }}
 spec:
   hosts:
-  - {{ .name }}.{{ .Values.gateway.host }}
+  - {{ .name }}.{{ $.Values.gateway.host }}
   gateways:
-  - {{ .Values.gateway.name  }}
+  - {{ $.Values.gateway.name  }}
   http:
   - route:
     - destination:
         host: {{ include "bithub.fullname" $ }}-{{ .name }}
         port:
-          number: {{ .Values.service.scope.port }}
+          number: {{ $.Values.service.scope.port }}
 
 ---
 apiVersion: networking.istio.io/v1alpha3
@@ -69,14 +69,14 @@ metadata:
     component: {{ .name | quote }}
 spec:
   hosts:
-  - {{ .name }}-image.{{ .Values.gateway.host }}
+  - {{ .name }}-image.{{ $.Values.gateway.host }}
   gateways:
-  - {{ .Values.gateway.name  }}
+  - {{ $.Values.gateway.name  }}
   http:
   - route:
     - destination:
         host: {{ include "bithub.fullname" $ }}-{{ .name }}
         port:
-          number: {{ .Values.service.image.port }}
+          number: {{ $.Values.service.image.port }}
 
 {{- end }}

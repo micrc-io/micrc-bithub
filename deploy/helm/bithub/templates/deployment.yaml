@@ -118,7 +118,6 @@ spec:
                   - /bin/sh
                   - -c
                   - |
-                    sleep 100;
                     until healthcheck.sh; do
                       echo wait for s3fs mount;
                       sleep 1;
@@ -260,7 +259,7 @@ spec:
                   - -c
                   - |
                     until [ -f "/share/term" ]; do
-                      echo wait for bit server stop;
+                      echo wait for easyimage stop;
                       sleep 1;
                     done
                     sleep 10;
@@ -274,7 +273,7 @@ spec:
           - name: TZ
             value: Asia/Shanghai
           - name: DEBUG
-            value: "true"
+            value: "false"
           ports:
             - name: image
               containerPort: 80
@@ -443,7 +442,6 @@ spec:
                   - /bin/sh
                   - -c
                   - |
-                    sleep 100;
                     until healthcheck.sh; do
                       echo wait for s3fs mount;
                       sleep 1;

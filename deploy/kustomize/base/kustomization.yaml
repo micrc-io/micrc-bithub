@@ -18,13 +18,13 @@ helmCharts:
         dependencies:
           - security
           - order
-      # domains:
-      #   - name: security
-      #     dependencies:
-      #       - design
-      #   - name: order
-      #     dependencies:
-      #       - design
+      domains:
+        - name: security
+          dependencies:
+            - design
+        - name: order
+          dependencies:
+            - design
       bucket:
         name: bithub-storage
         endpoint: https://oss-cn-chengdu.aliyuncs.com
