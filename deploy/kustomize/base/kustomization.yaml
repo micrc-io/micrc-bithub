@@ -10,6 +10,7 @@ helmCharts:
     releaseName: colibri-bithub
     version: 0.0.1
     valuesInline:
+      organization: colibri
       gateway:
         name: 'it-colibri-gateway'
         host: 'bithub.integration.it.colibrierp.com.br'

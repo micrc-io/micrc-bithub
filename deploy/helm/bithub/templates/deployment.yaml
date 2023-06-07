@@ -141,12 +141,12 @@ spec:
           imagePullPolicy: {{ .Values.image.bitserver.pullPolicy }}
           env:
           - name: SCOPE
-            value: {{ .Values.designDomain.name }}
+            value: {{ .Values.organization }}.{{ .Values.designDomain.name }}
           - name: SCOPE_REMOTES
             value:
               {{- $remotes := list -}}
               {{- range .Values.designDomain.dependencies -}}
-              {{- $remotes = append $remotes (printf "%s@https://%s.%s" . . $.Values.gateway.host) -}}
+              {{- $remotes = append $remotes (printf "%s.%s@https://%s.%s" $.Values.organization . . $.Values.gateway.host) -}}
               {{- end -}}
               {{ printf " %s" (join "," $remotes) }}
           ports:
@@ -155,7 +155,7 @@ spec:
               protocol: TCP
           volumeMounts:
             - name: s3fs-cache-scope
-              mountPath: /root/{{ .Values.designDomain.name }}
+              mountPath: /root/{{ .Values.organization }}.{{ .Values.designDomain.name }}
               mountPropagation: Bidirectional
             - name: share-scope
               mountPath: /share
@@ -465,12 +465,12 @@ spec:
           imagePullPolicy: {{ $.Values.image.bitserver.pullPolicy }}
           env:
           - name: SCOPE
-            value: {{ .name }}
+            value: {{ $.Values.organization }}.{{ .name }}
           - name: SCOPE_REMOTES
             value:
               {{- $remotes := list -}}
               {{- range .dependencies -}}
-              {{- $remotes = append $remotes (printf "%s@https://%s.%s" . . $.Values.gateway.host) -}}
+              {{- $remotes = append $remotes (printf "%s.%s@https://%s.%s" $.Values.organization . . $.Values.gateway.host) -}}
               {{- end -}}
               {{ printf " %s" (join "," $remotes) }}
           ports:
@@ -479,7 +479,7 @@ spec:
               protocol: TCP
           volumeMounts:
             - name: s3fs-cache-scope
-              mountPath: /root/{{ .name }}
+              mountPath: /root/{{ $.Values.organization }}.{{ .name }}
               mountPropagation: Bidirectional
             - name: share-scope
               mountPath: /share
