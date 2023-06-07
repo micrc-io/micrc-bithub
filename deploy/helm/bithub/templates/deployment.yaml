@@ -55,6 +55,8 @@ spec:
           env:
             - name: DOMAIN
               value: {{ .Values.designDomain.name }}
+            - name: S3FS_ARGS
+              value: "use_cache=/tmp"
             - name: AWS_S3_URL
               value: {{ .Values.bucket.endpoint }}
             - name: AWS_S3_BUCKET
@@ -85,6 +87,8 @@ spec:
           env:
             - name: DOMAIN
               value: {{ .Values.designDomain.name }}
+            - name: S3FS_ARGS
+              value: "use_cache=/tmp"
             - name: AWS_S3_BUCKET_BASE
               value: {{ .Values.bucket.name }}
             - name: AWS_S3_URL
@@ -214,6 +218,8 @@ spec:
           env:
             - name: DOMAIN
               value: {{ .Values.designDomain.name }}
+            - name: S3FS_ARGS
+              value: "use_cache=/tmp"
             - name: AWS_S3_BUCKET_BASE
               value: {{ .Values.bucket.name }}
             - name: AWS_S3_URL
@@ -349,26 +355,111 @@ spec:
       securityContext:
         {{- toYaml $.Values.podSecurityContext | nindent 8 }}
       volumes:
+        - name: s3fs-setup
+          configMap:
+            name: {{ include "bithub.name" $ }}
+            defaultMode: 0755
         - name: s3fs-cache
+          emptyDir: {}
+        - name: s3fs-cache-scope
+          emptyDir: {}
+        - name: share-scope
+          emptyDir: {}
+        - name: s3fs-cache-image
+          emptyDir: {}
+        - name: share-image
           emptyDir: {}
       initContainers:
         - name: s3fs-init
-          volumeMounts:
-            - name: s3fs-cache
-              mountPath: /data
-      containers:
-        - name: s3fs
-          ecurityContext:
+          securityContext:
             {{- toYaml $.Values.securityContext | nindent 12 }}
-          image: "{{ $.Values.image.s3fs.repository }}:{{ $.Values.image.s3fs.tag | default $.Chart.AppVersion }}"
+          image: "{{ $.Values.image.s3fs.repository }}:{{ $.Values.image.s3fs.tag }}"
+          imagePullPolicy: {{ $.Values.image.s3fs.pullPolicy }}
+          args:
+            - "/scripts/s3fs-setup.sh"
+          env:
+            - name: DOMAIN
+              value: {{ .name }}
+            - name: S3FS_ARGS
+              value: "use_cache=/tmp"
+            - name: AWS_S3_URL
+              value: {{ $.Values.bucket.endpoint }}
+            - name: AWS_S3_BUCKET
+              value: {{ $.Values.bucket.name }}
+            - name: AWS_S3_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $.Values.bucket.secretName }}
+                  key: {{ $.Values.bucket.accessIdKey }}
+            - name: AWS_S3_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $.Values.bucket.secretName }}
+                  key: {{ $.Values.bucket.accessSecretKey }}
+          volumeMounts:
+            - name: s3fs-setup
+              mountPath: /scripts/s3fs-setup.sh
+              subPath: s3fs-setup.sh
+            - name: s3fs-cache
+              mountPath: /opt/s3fs/bucket
+              mountPropagation: Bidirectional
+      containers:
+        - name: s3fs-sidecar-bitserver
+          securityContext:
+            {{- toYaml $.Values.securityContext | nindent 12 }}
+          image: "{{ $.Values.image.s3fs.repository }}:{{ $.Values.image.s3fs.tag }}"
           imagePullPolicy: {{ $.Values.image.s3fs.pullPolicy }}
           env:
-            - name: todo
-              value: todo
+            - name: DOMAIN
+              value: {{ .name }}
+            - name: S3FS_ARGS
+              value: "use_cache=/tmp"
+            - name: AWS_S3_BUCKET_BASE
+              value: {{ $.Values.bucket.name }}
+            - name: AWS_S3_URL
+              value: {{ $.Values.bucket.endpoint }}
+            - name: AWS_S3_BUCKET
+              value: $(AWS_S3_BUCKET_BASE):/$(DOMAIN)/scope
+            - name: AWS_S3_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $.Values.bucket.secretName }}
+                  key: {{ $.Values.bucket.accessIdKey }}
+            - name: AWS_S3_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $.Values.bucket.secretName }}
+                  key: {{ $.Values.bucket.accessSecretKey }}
           volumeMounts:
-            - name: s3fs-cache
-              mountPath: /data
+            - name: s3fs-cache-scope
+              mountPath: /opt/s3fs/bucket
               mountPropagation: Bidirectional
+            - name: share-scope
+              mountPath: /share
+          lifecycle:
+            postStart:
+              exec:
+                command:
+                  - /bin/sh
+                  - -c
+                  - |
+                    sleep 100;
+                    until healthcheck.sh; do
+                      echo wait for s3fs mount;
+                      sleep 1;
+                    done
+            preStop:
+              exec:
+                command:
+                  - /bin/sh
+                  - -c
+                  - |
+                    until [ -f "/share/term" ]; do
+                      echo wait for bitserver stop;
+                      sleep 1;
+                    done
+                    sleep 10;
+                    rm -rf /share/term;
         - name: bitserver
           securityContext:
             {{- toYaml $.Values.securityContext | nindent 12 }}
@@ -389,17 +480,47 @@ spec:
               containerPort: 3000
               protocol: TCP
           volumeMounts:
-            - name: s3fs-cache
-              mountPath: /root/data
-              mountPropagation: HostToContainer
+            - name: s3fs-cache-scope
+              mountPath: /root/{{ .name }}
+              mountPropagation: Bidirectional
+            - name: share-scope
+              mountPath: /share
+          lifecycle:
+            postStart:
+              exec:
+                command:
+                  - /bin/sh
+                  - -c
+                  - |
+                    trap "touch /share/term" INT;
+                    trap "touch /share/term" TERM;
+          startupProbe:
+            failureThreshold: 60
+            initialDelaySeconds: 300
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 1
+            httpGet:
+              path: /
+              port: scope
           livenessProbe:
+            initialDelaySeconds: 60
+            periodSeconds: 5
+            failureThreshold: 60
+            successThreshold: 1
+            timeoutSeconds: 1
             httpGet:
               path: /
-              port: http
+              port: scope
           readinessProbe:
+            initialDelaySeconds: 60
+            periodSeconds: 5
+            failureThreshold: 60
+            successThreshold: 1
+            timeoutSeconds: 1
             httpGet:
               path: /
-              port: http
+              port: scope
           resources:
             {{- toYaml $.Values.resources | nindent 12 }}
       {{- with $.Values.nodeSelector }}
@@ -414,30 +535,103 @@ spec:
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+        - name: s3fs-sidecar-easyimage
+          securityContext:
+            {{- toYaml $.Values.securityContext | nindent 12 }}
+          image: "{{ $.Values.image.s3fs.repository }}:{{ $.Values.image.s3fs.tag }}"
+          imagePullPolicy: {{ $.Values.image.s3fs.pullPolicy }}
+          env:
+            - name: DOMAIN
+              value: {{ .name }}
+            - name: S3FS_ARGS
+              value: "use_cache=/tmp"
+            - name: AWS_S3_BUCKET_BASE
+              value: {{ $.Values.bucket.name }}
+            - name: AWS_S3_URL
+              value: {{ $.Values.bucket.endpoint }}
+            - name: AWS_S3_BUCKET
+              value: $(AWS_S3_BUCKET_BASE):/$(DOMAIN)/image
+            - name: AWS_S3_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $.Values.bucket.secretName }}
+                  key: {{ $.Values.bucket.accessIdKey }}
+            - name: AWS_S3_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $.Values.bucket.secretName }}
+                  key: {{ $.Values.bucket.accessSecretKey }}
+          volumeMounts:
+            - name: s3fs-cache-image
+              mountPath: /opt/s3fs/bucket
+              mountPropagation: Bidirectional
+            - name: share-image
+              mountPath: /share
+          lifecycle:
+            postStart:
+              exec:
+                command:
+                  - /bin/sh
+                  - -c
+                  - |
+                    until healthcheck.sh; do
+                      echo wait for s3fs mount;
+                      sleep 1;
+                    done
+            preStop:
+              exec:
+                command:
+                  - /bin/sh
+                  - -c
+                  - |
+                    until [ -f "/share/term" ]; do
+                      echo wait for easyimage stop;
+                      sleep 1;
+                    done
+                    sleep 10;
+                    rm -rf /share/term;
         - name: easyimage
           securityContext:
             {{- toYaml $.Values.securityContext | nindent 12 }}
-          image: "{{ $.Values.image.easyimage.repository }}:{{ $.Values.image.easyimage.tag | default $.Chart.AppVersion }}"
+          image: "{{ $.Values.image.easyimage.repository }}:{{ $.Values.image.easyimage.tag }}"
           imagePullPolicy: {{ $.Values.image.easyimage.pullPolicy }}
           env:
-          - name: todo
-            value: todo
+          - name: TZ
+            value: Asia/Shanghai
+          - name: DEBUG
+            value: "false"
           ports:
             - name: image
-              containerPort: 8000
+              containerPort: 80
               protocol: TCP
           volumeMounts:
-            - name: s3fs-cache
-              mountPath: /root/data
-              mountPropagation: HostToContainer
+            - name: s3fs-cache-image
+              mountPath: /app/web/config
+              subPath: config
+              mountPropagation: Bidirectional
+            - name: s3fs-cache-image
+              mountPath: /app/web/i
+              subPath: i
+              mountPropagation: Bidirectional
+            - name: share-image
+              mountPath: /share
+          lifecycle:
+            postStart:
+              exec:
+                command:
+                  - /bin/sh
+                  - -c
+                  - |
+                    trap "touch /share/term" INT;
+                    trap "touch /share/term" TERM;
           livenessProbe:
             httpGet:
               path: /
-              port: http
+              port: image
           readinessProbe:
             httpGet:
               path: /
-              port: http
+              port: image
           resources:
             {{- toYaml $.Values.resources | nindent 12 }}
       {{- with $.Values.nodeSelector }}
